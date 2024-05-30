@@ -12,9 +12,10 @@ from dotenv import load_dotenv
 from openai import OpenAI
 import pandas as pd
 import numpy as np
+import json
+import requests
 from lsu_pilot.questions import answer_question
 from lsu_pilot.functions import functions, run_function
-import json
 
 CODE_PROMPT = """
 Here are two input:output examples for code generation. Please use these and follow the styling for future requests that you think are pertinent to the request.
@@ -82,9 +83,19 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
   )
   
 async def mozilla(update: Update, context: ContextTypes.DEFAULT_TYPE):
-      answer = answer_question(df, question=update.message.text, debug=True)
-      await context.bot.send_message(chat_id=update.effective_chat.id, text=answer)
+  answer = answer_question(df, question=update.message.text, debug=True)
+  await context.bot.send_message(chat_id=update.effective_chat.id, text=answer)
 
+async def image(update: Update, context: ContextTypes.DEFAULT_TYPE):
+  response = openai.images.generate(prompt=update.message.text,
+                                    model="dall-e-3",
+                                    n=1,
+                                    size="1024x1024")
+  image_url = response.data[0].url
+  image_response = requests.get(image_url)
+  await context.bot.send_photo(chat_id=update.effective_chat.id,
+                               photo=image_response.content)
+  
 async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
   messages.append({"role": "user", "content": update.message.text})
   initial_response = openai.chat.completions.create(model="gpt-3.5-turbo",
@@ -137,9 +148,11 @@ if __name__ == '__main__':
   start_handler = CommandHandler('start', start)
   chat_handler = MessageHandler(filters.TEXT & (~filters.COMMAND), chat)
   mozilla_handler = CommandHandler('mozilla', mozilla)
+  image_handler = CommandHandler('image', image)
   
   application.add_handler(start_handler)
   application.add_handler(chat_handler)
   application.add_handler(mozilla_handler)
+  application.add_handler(image_handler)
 
   application.run_polling()
