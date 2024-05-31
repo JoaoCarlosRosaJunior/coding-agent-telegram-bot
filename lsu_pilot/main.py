@@ -96,6 +96,20 @@ async def image(update: Update, context: ContextTypes.DEFAULT_TYPE):
   await context.bot.send_photo(chat_id=update.effective_chat.id,
                                photo=image_response.content)
   
+async def transcribe_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+  voice_id = update.message.voice.file_id
+  if voice_id:
+        file = await context.bot.get_file(voice_id)
+        await file.download_to_drive(f"voice_note_{voice_id}.ogg")
+        await update.message.reply_text("Voice note downloaded, transcribing now")
+        audio_file = open(f"voice_note_{voice_id}.ogg", "rb")
+        transcript = openai.audio.transcriptions.create(
+            model="whisper-1", file=audio_file
+        )
+        await update.message.reply_text(
+            f"Transcript finished:\n {transcript.text}"
+        )
+  
 async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
   messages.append({"role": "user", "content": update.message.text})
   initial_response = openai.chat.completions.create(model="gpt-3.5-turbo",
@@ -149,10 +163,12 @@ if __name__ == '__main__':
   chat_handler = MessageHandler(filters.TEXT & (~filters.COMMAND), chat)
   mozilla_handler = CommandHandler('mozilla', mozilla)
   image_handler = CommandHandler('image', image)
+  audio_handler = MessageHandler(filters.VOICE, transcribe_message)
   
   application.add_handler(start_handler)
   application.add_handler(chat_handler)
   application.add_handler(mozilla_handler)
   application.add_handler(image_handler)
+  application.add_handler(audio_handler)
 
   application.run_polling()
